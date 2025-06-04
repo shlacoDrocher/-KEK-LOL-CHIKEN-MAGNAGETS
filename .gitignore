@@ -1,0 +1,91 @@
+# Объектные файлы
+*.o
+*.ko
+*.obj
+*.elf
+
+# Прелинкованные файлы
+*.ilk
+*.map
+*.exp
+
+# Библиотеки
+*.lib
+*.a
+*.la
+*.lo
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Исполняемые файлы
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+server
+
+# Debug файлы
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Файлы ядра
+core
+
+# Директории
+obj/
+logs/
+build/
+dist/
+tmp/
+temp/
+
+# Файлы логов
+*.log
+log.txt
+*.log.*
+
+# Специфичные для OS файлы
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*:Zone.Identifier
+
+# Файлы редакторов
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+.vs/
+*.sublime-workspace
+*.sublime-project
+
+# Файлы зависимостей
+node_modules/
+jspm_packages/
+
+# Файлы настроек
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Временные файлы
+*.tmp
+*.temp
+*.bak 
