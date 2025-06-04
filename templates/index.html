@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=yes">
+<title>Какой ты брейнрот?</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<video id="background-video" autoplay muted loop playsinline preload="auto">
+  <source src="media/video/lyagushki_optimized.mp4" type="video/mp4">
+  Ваш браузер не поддерживает видео.
+</video>
+
+<!-- Добавляем кнопку управления звуком -->
+<button id="sound-toggle" class="sound-off">🔇</button>
+
+<!-- Добавляем кнопку выбора видео -->
+<button id="video-select-btn" class="video-btn" style="display: flex;">🎬</button>
+
+<!-- Модальное окно для выбора видео -->
+<div id="video-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Выберите фоновое видео</h2>
+      <button class="close-btn">Закрыть</button>
+    </div>
+    <div id="video-list" class="video-grid"></div>
+  </div>
+</div>
+
+<div id="restart-btn-bg"></div>
+<button id="restart-btn">Пройти тест снова</button>
+
+<div id="container">
+  <div id="start-screen">
+    <div id="start-text1" class="start-text">Postavщик Glиnы для вас представляет</div>
+    <div id="start-text2" class="start-text" style="display:none;">Какой ты брейнрот</div>
+    <button id="start-btn" style="display:none;">Начать тест</button>
+  </div>
+
+  <div id="quiz-frame" aria-live="polite" role="region" aria-label="Тест">
+  <div id="question-counter" class="question-counter"></div>
+  <div id="question"></div>
+  <div id="answers"></div>
+  <button id="next-btn" disabled>Далее</button>
+
+    <div id="result-container" style="display:none;">
+      <div id="loading-text"></div>
+      <div id="progress-bar">
+        <div id="progress-fill"></div>
+      </div>
+      <div id="result-name"></div>
+      <img id="result-img" src="" alt="Результат" />
+    </div>
+  </div>
+
+</div>
+
+<script src="js/quiz.js"></script>
+
+</body>
+</html>
