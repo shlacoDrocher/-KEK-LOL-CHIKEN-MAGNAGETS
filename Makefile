@@ -56,4 +56,49 @@ $(OBJDIR)/$(LOGGER_DIR)/%.o: $(LOGGER_DIR)/%.c $(HEADERS) | $(OBJDIRS)
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+# Правило для очистки сборки
+clean:
+	rm -rf $(OBJDIR) $(TARGET)
 
+# Правило для запуска сервера
+run: $(TARGET)
+	./$(TARGET)
+
+# Правило для запуска сервера в фоновом режиме
+daemon: $(TARGET)
+	./$(TARGET) -d
+
+# Правило для запуска сервера с отладочной информацией
+debug: CFLAGS += -DDEBUG
+debug: clean all
+
+# Правило для установки сервера
+install: $(TARGET)
+	mkdir -p /usr/local/bin
+	cp $(TARGET) /usr/local/bin/
+	chmod +x /usr/local/bin/$(TARGET)
+
+# Правило для удаления установленного сервера
+uninstall:
+	rm -f /usr/local/bin/$(TARGET)
+
+# Правило для остановки сервера
+stop:
+	@if [ -f /tmp/server.pid ]; then \
+		echo "Stopping server with PID $$(cat /tmp/server.pid)"; \
+		kill -TERM $$(cat /tmp/server.pid); \
+	else \
+		echo "Server PID file not found"; \
+	fi
+
+# Правило для вывода справки
+help:
+	@echo "Доступные команды:"
+	@echo "  make        - Сборка сервера"
+	@echo "  make clean  - Очистка сборки"
+	@echo "  make run    - Запуск сервера в обычном режиме"
+	@echo "  make daemon - Запуск сервера в фоновом режиме"
+	@echo "  make debug  - Сборка с отладочной информацией"
+	@echo "  make stop   - Остановка запущенного сервера"
+	@echo "  make install - Установка сервера в систему"
+	@echo "  make uninstall - Удаление сервера из системы"
