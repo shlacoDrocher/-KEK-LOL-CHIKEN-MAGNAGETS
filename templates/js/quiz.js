@@ -259,3 +259,677 @@ tripi: {
   audio: 'media/audio/tripi.mp3'
 }
   };
+// Элементы DOM
+const startText1 = document.getElementById('start-text1');
+const startText2 = document.getElementById('start-text2');
+const startBtn = document.getElementById('start-btn');
+const quizFrame = document.getElementById('quiz-frame');
+const questionEl = document.getElementById('question');
+const answersEl = document.getElementById('answers');
+const nextBtn = document.getElementById('next-btn');
+const resultContainer = document.getElementById('result-container');
+const resultName = document.getElementById('result-name');
+const resultImg = document.getElementById('result-img');
+const loadingText = document.getElementById('loading-text');
+const progressBar = document.getElementById('progress-bar');
+const progressFill = document.getElementById('progress-fill');
+const restartBtn = document.getElementById('restart-btn');
+const restartBtnBg = document.getElementById('restart-btn-bg');
+const backgroundVideo = document.getElementById('background-video');
+const soundToggle = document.getElementById('sound-toggle');
+
+// Состояния
+let currentQuestion = 0;
+let score = {};
+let selectedValue = null;
+let resultAudio = null;
+let isSoundOn = false;
+let wasSoundOnBeforeResult = false;
+let isResultPlaying = false;
+
+// Загрузочные фразы
+const loadingPhrases = [
+    'Нюхаем твои трусы...',
+    'Запрашиваем базу данных арбузов...',
+    'Перекапываем огород бабушки...',
+    'Достаём сковородку для жарки...',
+    'Подслушиваем разговоры соседей...',
+    'Проверяем твою историю браузера...',
+    'Консультируемся с гадалкой...',
+    'Подсчитываем ваши результаты...'
+];
+
+// Глобальные переменные для работы с видео
+let videoModal = null;
+let videoSelectBtn = null;
+let closeBtn = null;
+let videoList = null;
+let currentVideoPath = 'media/video/zlolo.mp4';
+let availableVideos = [];
+
+// Функция для загрузки списка доступных видео
+function loadAvailableVideos() {
+    // Резервный список видео в случае ошибки API
+    const fallbackVideos = [
+        { name: 'zlolo.mp4', path: 'media/video/zlolo.mp4' }
+    ];
+    
+    // Устанавливаем таймаут для запроса
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Превышено время ожидания API')), 5000);
+    });
+    
+    // Выполняем запрос с таймаутом
+    Promise.race([
+        fetch('/api/videos'),
+        timeoutPromise
+    ])
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Ошибка HTTP: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.videos && Array.isArray(data.videos) && data.videos.length > 0) {
+                availableVideos = data.videos;
+                console.log('Успешно загружен список видео:', availableVideos.length);
+            } else {
+                throw new Error('Получен пустой или некорректный список видео');
+            }
+            renderVideoList();
+        })
+        .catch(error => {
+            console.error('Ошибка при загрузке списка видео:', error);
+            
+            // Используем резервный список видео
+            console.log('Используем резервный список видео');
+            availableVideos = fallbackVideos;
+            renderVideoList();
+            
+            // Отображаем уведомление о проблеме
+            const videoSelectBtn = document.getElementById('video-select-btn');
+            if (videoSelectBtn) {
+                videoSelectBtn.title = 'Ограниченный выбор видео из-за ошибки сервера';
+                videoSelectBtn.style.opacity = '0.7';
+            }
+        });
+}
+
+// Функция для отображения списка видео в модальном окне
+function renderVideoList() {
+    if (!videoList) return;
+    
+    videoList.innerHTML = '';
+    
+    // Показываем индикатор загрузки в модальном окне
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'loading-indicator';
+    loadingDiv.textContent = 'Загрузка видео...';
+    videoList.appendChild(loadingDiv);
+    
+    // Проверяем доступность каждого видео перед добавлением в список
+    const validVideos = [];
+    const videoPromises = availableVideos.map((video, index) => {
+        return new Promise((resolve) => {
+            const tempVideo = document.createElement('video');
+            tempVideo.muted = true;
+            
+            // Устанавливаем таймаут для проверки
+            const timeout = setTimeout(() => {
+                console.warn(`Видео ${video.path} недоступно (таймаут)`);
+                resolve();
+            }, 3000);
+            
+            // Обработчики событий для проверки доступности видео
+            tempVideo.onloadeddata = () => {
+                clearTimeout(timeout);
+                validVideos.push(video);
+                resolve();
+            };
+            
+            tempVideo.onerror = () => {
+                clearTimeout(timeout);
+                console.warn(`Видео ${video.path} недоступно (ошибка загрузки)`);
+                resolve();
+            };
+            
+            // Начинаем загрузку метаданных видео
+            tempVideo.src = video.path;
+            tempVideo.preload = 'metadata';
+        });
+    });
+    
+    // После проверки всех видео отображаем только доступные
+    Promise.all(videoPromises).then(() => {
+        // Удаляем индикатор загрузки
+        videoList.innerHTML = '';
+        
+        if (validVideos.length === 0) {
+            const noVideoDiv = document.createElement('div');
+            noVideoDiv.className = 'no-videos-message';
+            noVideoDiv.textContent = 'Доступных видео не найдено';
+            videoList.appendChild(noVideoDiv);
+            return;
+        }
+        
+        validVideos.forEach(video => {
+            const videoItem = document.createElement('div');
+            videoItem.className = 'video-item';
+            if (video.path === currentVideoPath) {
+                videoItem.classList.add('active');
+            }
+            
+            // Создаем миниатюру видео
+            const thumbnail = document.createElement('video');
+            thumbnail.className = 'video-thumbnail';
+            thumbnail.src = video.path;
+            thumbnail.muted = true;
+            thumbnail.preload = 'metadata';
+            
+            // Создаем подпись с названием видео
+            const videoName = document.createElement('div');
+            videoName.className = 'video-name';
+            videoName.textContent = video.name;
+            
+            // Добавляем обработчик клика
+            videoItem.addEventListener('click', () => {
+                changeBackgroundVideo(video.path);
+                
+                // Обновляем активный элемент
+                document.querySelectorAll('.video-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                videoItem.classList.add('active');
+                
+                // Закрываем модальное окно
+                videoModal.style.display = 'none';
+            });
+            
+            videoItem.appendChild(thumbnail);
+            videoItem.appendChild(videoName);
+            videoList.appendChild(videoItem);
+        });
+    });
+}
+
+// Функция для изменения фонового видео
+function changeBackgroundVideo(videoPath) {
+    if (currentVideoPath === videoPath) return;
+    
+    // Сохраняем предыдущий путь для отката в случае ошибки
+    const previousVideoPath = currentVideoPath;
+    
+    currentVideoPath = videoPath;
+    const video = document.getElementById('background-video');
+    const source = video.querySelector('source');
+    
+    // Запоминаем текущее состояние звука
+    const wasMuted = video.muted;
+    
+    // Обновляем источник видео
+    source.src = videoPath;
+    
+    // Определяем тип видео
+    const fileExtension = videoPath.split('.').pop().toLowerCase();
+    const videoType = fileExtension === 'mp4' ? 'video/mp4' : 
+                     fileExtension === 'webm' ? 'video/webm' : 'video/mp4';
+    source.type = videoType;
+    
+    // Устанавливаем обработчик ошибок перед загрузкой
+    const handleError = function() {
+        console.error("Ошибка загрузки видео:", videoPath);
+        
+        // Откатываемся к предыдущему видео
+        source.src = previousVideoPath;
+        const prevExtension = previousVideoPath.split('.').pop().toLowerCase();
+        const prevType = prevExtension === 'mp4' ? 'video/mp4' : 
+                        prevExtension === 'webm' ? 'video/webm' : 'video/mp4';
+        source.type = prevType;
+        
+        // Восстанавливаем предыдущий путь
+        currentVideoPath = previousVideoPath;
+        
+        // Перезагружаем и запускаем видео
+        video.load();
+        video.muted = wasMuted;
+        video.play().catch(e => {
+            console.error("Не удалось восстановить предыдущее видео:", e);
+        });
+        
+        // Удаляем обработчик ошибок
+        video.removeEventListener('error', handleError);
+    };
+    
+    // Добавляем обработчик ошибок
+    video.addEventListener('error', handleError, { once: true });
+    
+    // Перезагружаем видео
+    video.load();
+    
+    // Восстанавливаем состояние звука и запускаем воспроизведение
+    video.muted = wasMuted;
+    
+    // Запускаем воспроизведение и обрабатываем ошибки
+    video.onloadedmetadata = function() {
+        video.play().catch(e => {
+            console.error("Ошибка воспроизведения видео:", e);
+            // Обработчик ошибок handleError будет вызван автоматически
+        });
+    };
+    
+    // Сохраняем выбор в localStorage только при успешной загрузке
+    video.oncanplay = function() {
+        localStorage.setItem('selectedVideo', videoPath);
+        
+        // Удаляем обработчик ошибок, так как видео успешно загружено
+        video.removeEventListener('error', handleError);
+    };
+}
+
+// Функция для инициализации модального окна
+function initVideoModal() {
+    videoModal = document.getElementById('video-modal');
+    videoSelectBtn = document.getElementById('video-select-btn');
+    closeBtn = document.querySelector('.close-btn');
+    videoList = document.getElementById('video-list');
+    
+    // Делаем кнопку выбора видео видимой
+    videoSelectBtn.style.display = 'flex';
+    
+    // Загружаем сохраненный выбор видео
+    const savedVideo = localStorage.getItem('selectedVideo');
+    if (savedVideo) {
+        changeBackgroundVideo(savedVideo);
+    }
+    
+    // Добавляем обработчики событий
+    videoSelectBtn.addEventListener('click', () => {
+        videoModal.style.display = 'block';
+    });
+    
+    closeBtn.addEventListener('click', () => {
+        videoModal.style.display = 'none';
+    });
+    
+    // Закрытие модального окна при клике вне его содержимого
+    window.addEventListener('click', (event) => {
+        if (event.target === videoModal) {
+            videoModal.style.display = 'none';
+        }
+    });
+    
+    // Загружаем список доступных видео
+    loadAvailableVideos();
+}
+
+// Обновление кнопки звука
+function updateSoundButton() {
+    if (isSoundOn) {
+        soundToggle.textContent = "🔊";
+        soundToggle.classList.replace('sound-off', 'sound-on');
+    } else {
+        soundToggle.textContent = "🔇";
+        soundToggle.classList.replace('sound-on', 'sound-off');
+    }
+}
+
+// Переключение звука
+function toggleSound() {
+    if (isResultPlaying) return;
+    
+    isSoundOn = !isSoundOn;
+    backgroundVideo.muted = !isSoundOn;
+    updateSoundButton();
+}
+
+// Автовоспроизведение фонового видео
+function initBackgroundVideo() {
+    // Установка начального состояния звука
+    backgroundVideo.muted = true;
+    isSoundOn = false;
+    updateSoundButton();
+    
+    // Пытаемся запустить видео
+    backgroundVideo.play().catch(e => {
+        console.log("Автовоспроизведение видео заблокировано. Видео будет запущено при взаимодействии.");
+        
+        document.addEventListener('click', function firstInteraction() {
+            backgroundVideo.play();
+            document.removeEventListener('click', firstInteraction);
+        });
+    });
+    
+    backgroundVideo.addEventListener('error', function() {
+        console.error("Ошибка загрузки видео, пробуем перезагрузить");
+        backgroundVideo.load();
+    });
+}
+
+// Запуск интро-анимации
+function runIntro() {
+    // Показываем кнопку звука почти сразу (через 0.5 секунды)
+    setTimeout(() => {
+        soundToggle.style.display = 'block';
+        soundToggle.style.animation = 'fadeIn 1s forwards';
+    }, 500);
+    
+    setTimeout(() => {
+    startText1.style.opacity = 0;
+    startText1.style.display = 'block';
+    startText1.style.animation = 'fadeIn 2s forwards';
+    }, 1400);
+    setTimeout(() => {
+        startText1.style.animation = 'fadeOut 1.5s forwards';
+    }, 3500);
+
+    setTimeout(() => {
+        startText1.style.display = 'none';
+        startText2.style.display = 'block';
+        startText2.style.opacity = 0;
+        startText2.style.animation = 'fadeIn 2s forwards';
+    }, 5000);
+
+    setTimeout(() => {
+        startBtn.style.display = 'inline-block';
+        startBtn.style.opacity = 0;
+        startBtn.style.animation = 'fadeIn 1.5s forwards';
+    }, 7000);
+}
+
+// Показать вопрос
+function showQuestion() {
+  nextBtn.disabled = true;
+  selectedValue = null;
+
+  // Отображение номера вопроса
+  const questionCounter = document.getElementById('question-counter');
+  if (questionCounter) {
+    questionCounter.textContent = `Вопрос ${currentQuestion + 1} из ${questions.length}`;
+  }
+
+  // Отображение текста вопроса
+  questionEl.textContent = questions[currentQuestion].text;
+
+  // Очистка и заполнение вариантов ответа
+  answersEl.innerHTML = '';
+  questions[currentQuestion].options.forEach(ans => {
+    const button = document.createElement('button');
+    button.className = 'answer-btn';
+    button.textContent = ans.text;
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.answer-btn').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+      button.classList.add('selected');
+      nextBtn.disabled = false;
+      selectedValue = ans.value;
+    });
+    answersEl.appendChild(button);
+  });
+}
+
+// Показать результат
+function showResult() {
+    const maxPoints = Math.max(...Object.values(score));
+    const winner = Object.keys(score).find(c => score[c] === maxPoints);
+
+    // Скрываем элементы вопроса
+    document.getElementById('question').style.display = 'none';
+    document.getElementById('answers').style.display = 'none';
+    nextBtn.style.display = 'none';
+
+    document.getElementById('question-counter').style.display = 'none';
+    
+    // Показываем контейнер результата
+    resultContainer.style.display = 'flex';
+    resultName.style.display = 'none';
+    resultImg.style.display = 'none';
+    
+    // Скрываем кнопку перезапуска
+    restartBtn.classList.remove('visible');
+    restartBtnBg.classList.remove('visible');
+
+    // Показываем загрузочные сообщения
+    loadingText.style.display = 'block';
+    progressBar.style.display = 'block';
+    progressFill.style.width = '0%';
+
+    let currentPhraseIndex = 0;
+    const totalPhrases = loadingPhrases.length;
+    const phraseDuration = 1000;
+    
+    function showNextPhrase() {
+        if (currentPhraseIndex < totalPhrases) {
+            loadingText.textContent = loadingPhrases[currentPhraseIndex];
+            progressFill.style.width = `${((currentPhraseIndex + 1) / totalPhrases) * 100}%`;
+            currentPhraseIndex++;
+            setTimeout(showNextPhrase, phraseDuration);
+        } else {
+            // Прямой показ результата без взрыва
+            showResultAfterExplosion(winner);
+        }
+    }
+    
+    showNextPhrase();
+}
+
+// Функция показа результата (без взрыва)
+function showResultAfterExplosion(winner) {
+    // Устанавливаем флаг, что началось воспроизведение результата
+    isResultPlaying = true;
+    
+    // Скрываем загрузочные сообщения
+    loadingText.style.display = 'none';
+    progressBar.style.display = 'none';
+
+    // Запоминаем состояние звука перед воспроизведением результата
+    wasSoundOnBeforeResult = isSoundOn;
+    
+    // Выключаем звук фонового видео
+    backgroundVideo.muted = true;
+    
+    // Блокируем кнопку звука
+    soundToggle.disabled = true;
+    soundToggle.classList.add('disabled');
+    
+    // Показываем название результата
+    resultName.textContent = `Ты — ${resultMap[winner].name}!\n${resultMap[winner].desc}`;
+    resultName.style.display = 'block';
+    resultName.style.opacity = '0';
+    resultName.style.animation = 'fadeIn 1s forwards';
+    
+    // Создаем новое изображение для предварительной загрузки
+    const preloadImg = new Image();
+    preloadImg.src = resultMap[winner].image;
+    
+    // Ждем полной загрузки изображения
+    preloadImg.onload = () => {
+        // Только после загрузки устанавливаем источник и запускаем анимацию
+        resultImg.src = resultMap[winner].image;
+        resultImg.style.display = 'block';
+        resultImg.style.opacity = '0';
+        resultImg.style.animation = 'emergeFromFire 1.5s forwards';
+        
+        // Запускаем звук результата через 500 мс
+        setTimeout(() => {
+            if (resultMap[winner]?.audio) {
+                // Останавливаем предыдущий звук, если он есть
+                if (resultAudio) {
+                    resultAudio.pause();
+                    resultAudio.currentTime = 0;
+                }
+                
+                resultAudio = new Audio(resultMap[winner].audio);
+                resultAudio.play().catch(e => console.error("Ошибка воспроизведения звука:", e));
+                
+                resultAudio.onended = function() {
+                    // Восстанавливаем звук фона после завершения звука результата
+                    backgroundVideo.muted = !wasSoundOnBeforeResult;
+                    
+                    // Разблокируем кнопку звука
+                    soundToggle.disabled = false;
+                    soundToggle.classList.remove('disabled');
+                    
+                    // Сбрасываем флаг воспроизведения
+                    isResultPlaying = false;
+                    
+                    showRestartButton();
+                };
+            } else {
+                // Восстанавливаем звук фона
+                backgroundVideo.muted = !wasSoundOnBeforeResult;
+                
+                // Разблокируем кнопку звука
+                soundToggle.disabled = false;
+                soundToggle.classList.remove('disabled');
+                
+                // Сбрасываем флаг воспроизведения
+                isResultPlaying = false;
+                
+                showRestartButton();
+            }
+        }, 500);
+    };
+    
+    // Обработка ошибки загрузки изображения
+    preloadImg.onerror = () => {
+        console.error('Ошибка загрузки изображения:', resultMap[winner].image);
+        // Все равно пытаемся показать изображение
+        resultImg.src = resultMap[winner].image;
+        resultImg.style.display = 'block';
+        resultImg.style.opacity = '0';
+        resultImg.style.animation = 'emergeFromFire 1.5s forwards';
+        
+        // Запускаем звук результата
+        setTimeout(() => {
+            if (resultMap[winner]?.audio) {
+                // Останавливаем предыдущий звук, если он есть
+                if (resultAudio) {
+                    resultAudio.pause();
+                    resultAudio.currentTime = 0;
+                }
+                
+                resultAudio = new Audio(resultMap[winner].audio);
+                resultAudio.play().catch(e => console.error("Ошибка воспроизведения звука:", e));
+                
+                resultAudio.onended = function() {
+                    // Восстанавливаем звук фона после завершения звука результата
+                    backgroundVideo.muted = !wasSoundOnBeforeResult;
+                    
+                    // Разблокируем кнопку звука
+                    soundToggle.disabled = false;
+                    soundToggle.classList.remove('disabled');
+                    
+                    // Сбрасываем флаг воспроизведения
+                    isResultPlaying = false;
+                    
+                    showRestartButton();
+                };
+            } else {
+                // Восстанавливаем звук фона
+                backgroundVideo.muted = !wasSoundOnBeforeResult;
+                
+                // Разблокируем кнопку звука
+                soundToggle.disabled = false;
+                soundToggle.classList.remove('disabled');
+                
+                // Сбрасываем флаг воспроизведения
+                isResultPlaying = false;
+                
+                showRestartButton();
+            }
+        }, 500);
+    };
+}
+
+// Показать кнопку перезапуска
+function showRestartButton() {
+    restartBtn.classList.add('visible');
+    restartBtnBg.classList.add('visible');
+    restartBtn.style.animation = 'fadeIn 0.8s forwards';
+}
+
+// Инициализация
+function init() {
+    // Инициализируем модальное окно для выбора видео в самом начале
+    initVideoModal();
+    
+    initBackgroundVideo();
+    runIntro();
+    
+    // Настройка кнопки звука
+    soundToggle.addEventListener('click', toggleSound);
+    soundToggle.style.display = 'none'; // Скрываем до появления кнопки старта
+    updateSoundButton();
+    
+    // Клик по старту
+    startBtn.addEventListener('click', () => {
+        // Выключаем звук фонового видео
+        backgroundVideo.muted = true;
+        isSoundOn = false;
+        updateSoundButton();
+        
+        document.getElementById('start-screen').style.display = 'none';
+        quizFrame.classList.add('visible');
+        showQuestion();
+    });
+
+    // Клик по кнопке Далее
+    nextBtn.addEventListener('click', () => {
+        if (!selectedValue) return;
+
+        score[selectedValue] = (score[selectedValue] || 0) + 1;
+        currentQuestion++;
+        selectedValue = null;
+
+        if (currentQuestion < questions.length) {
+            showQuestion();
+        } else {
+            showResult();
+        }
+    });
+
+    // Перезапуск теста
+restartBtn.addEventListener('click', function() {
+    // Восстанавливаем звук фона в соответствии с текущей настройкой
+    backgroundVideo.muted = !isSoundOn;
+    
+    // УБИРАЕМ ПЕРЕМОТКУ В НАЧАЛО
+    // backgroundVideo.currentTime = 0; // Эту строку удаляем
+    
+    // УБИРАЕМ ПРИНУДИТЕЛЬНЫЙ ЗАПУСК ВИДЕО
+    // backgroundVideo.play().catch(...); // Эту строку удаляем
+    
+    // Скрываем кнопку и подложку
+    restartBtn.classList.remove('visible');
+    restartBtnBg.classList.remove('visible');
+    
+    // Сбрасываем состояние
+    currentQuestion = 0;
+    score = {};
+    selectedValue = null;
+
+    document.getElementById('question-counter').style.display = 'block';
+    
+    // Скрываем контейнер результата
+    resultContainer.style.display = 'none';
+    
+    // Показываем элементы вопроса
+    document.getElementById('question').style.display = 'block';
+    document.getElementById('answers').style.display = 'block';
+    nextBtn.style.display = 'inline-block';
+    nextBtn.disabled = true;
+    
+    // Сбрасываем стили рамки теста
+    quizFrame.classList.add('visible');
+    quizFrame.style.opacity = '1';
+    quizFrame.style.transform = 'translateY(0)';
+    
+    // Перезапускаем с первого вопроса
+    showQuestion();
+});
+}
+
+// Запускаем инициализацию при загрузке страницы
+document.addEventListener('DOMContentLoaded', init);
